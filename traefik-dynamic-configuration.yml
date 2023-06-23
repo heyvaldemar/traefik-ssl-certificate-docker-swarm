@@ -1,0 +1,6 @@
+# Traefik dynamic configuration
+
+tls:
+  certificates:
+    - certFile: /run/secrets/wildcard-heyvaldemar-net.crt
+      keyFile: /run/secrets/wildcard-heyvaldemar-net.key

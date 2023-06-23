@@ -1,0 +1,158 @@
+# Traefik with SSL Certificate in a Docker Swarm
+
+# Author
+# hey, I’m Vladimir Mikhalev, but my friends call me Valdemar.
+
+# My website with detailed IT guides: https://www.heyvaldemar.com/
+# Follow me on YouTube: https://www.youtube.com/channel/UCf85kQ0u1sYTTTyKVpxrlyQ?sub_confirmation=1
+# Follow me on Twitter: https://twitter.com/heyValdemar
+# Follow me on Instagram: https://www.instagram.com/heyvaldemar/
+# Follow me on Facebook: https://www.facebook.com/heyValdemarFB/
+# Follow me on TikTok: https://www.tiktok.com/@heyvaldemar
+# Follow me on LinkedIn: https://www.linkedin.com/in/heyvaldemar/
+# Follow me on GitHub: https://github.com/heyvaldemar
+
+# Communication
+# Chat with IT pros on Discord: https://discord.gg/AJQGCCBcqf
+# Reach me at ask@sre.gg
+
+# Give Thanks
+# Support on GitHub: https://github.com/sponsors/heyValdemar
+# Support on Patreon: https://www.patreon.com/heyValdemar
+# Support on BuyMeaCoffee: https://www.buymeacoffee.com/heyValdemar
+# Support on Ko-fi: https://ko-fi.com/heyValdemar
+# Support on PayPal: https://www.paypal.com/paypalme/heyValdemarCOM
+
+# Install Docker Swarm by following my guide: https://www.heyvaldemar.com/install-docker-swarm-on-ubuntu-server/
+
+# Create a network for Traefik, config and secrets for storing the Traefik configuration, certificate and key on the Docker Swarm manager node before applying the configuration.
+
+# Create a network for Traefik using the command:
+# docker network create -d overlay traefik-network
+
+# Create a secret for storing the certificate using the command:
+# docker secret create wildcard-heyvaldemar-net.crt /path/to/wildcard-heyvaldemar-net.crt
+
+# Create a secret for storing the key using the command:
+# docker secret create wildcard-aheyvaldemartc-services.key /path/to/wildcard-heyvaldemar-net.key
+
+# Create a config for storing the Traefik configuration using the command:
+# docker config create traefik-dynamic-configuration.yml /path/to/traefik-dynamic-configuration.yml
+
+# Example of traefik-dynamic-configuration.yml:
+# tls:
+#   certificates:
+#     - certFile: /run/secrets/wildcard-heyvaldemar-net.crt
+#       keyFile: /run/secrets/wildcard-heyvaldemar-net.key
+
+# Deploy Traefik in a Docker Swarm using the command:
+# docker stack deploy -c traefik-ssl-certificate-docker-swarm.yml traefik
+
+version: '3.9'
+
+x-default-opts:
+  &default-opts
+  logging:
+    options:
+      max-size: "10m"
+
+networks:
+  traefik-network:
+    external: true
+
+configs:
+  traefik-dynamic-configuration.yml:
+    external: true
+
+secrets:
+  wildcard-heyvaldemar-net.crt:
+    external: true
+
+  wildcard-heyvaldemar-net.key:
+    external: true
+
+services:
+  traefik:
+    <<: *default-opts
+    # Image tag (replace with yours)
+    image: traefik:2.8
+    command:
+      - "--log.level=WARN"
+      - "--accesslog=true"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--ping=true"
+      - "--ping.entrypoint=ping"
+      - "--entryPoints.ping.address=:8082"
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.websecure.address=:443"
+      - "--providers.docker=true"
+      - "--providers.docker.watch=true"
+      - "--providers.docker.swarmMode=true"
+      - "--providers.docker.swarmModeRefreshSeconds=15s"
+      - "--providers.docker.network=traefik-network"
+      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
+      - "--providers.docker.exposedByDefault=false"
+      - "--providers.file.filename=/etc/traefik/configs/traefik-dynamic-configuration.yml"
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.buckets=0.1,0.3,1.2,5.0"
+      - "--global.checkNewVersion=true"
+      - "--global.sendAnonymousUsage=false"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - traefik-network
+    ports:
+      - "80:80"
+      - "443:443"
+    configs:
+      - source: traefik-dynamic-configuration.yml
+        target: /etc/traefik/configs/traefik-dynamic-configuration.yml
+    secrets:
+      - wildcard-heyvaldemar-net.crt
+      - wildcard-heyvaldemar-net.key
+    healthcheck:
+      test: ["CMD", "wget", "http://localhost:8082/ping","--spider"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    deploy:
+      mode: replicated
+      replicas: 3
+      placement:
+        constraints:
+          - node.role == manager
+      update_config:
+        delay: 15s
+        parallelism: 1
+        monitor: 10s
+        failure_action: rollback
+        max_failure_ratio: 0.55
+      # Container resources (replace with yours)
+      resources:
+        limits:
+          cpus: '1.55'
+          memory: 2G
+        reservations:
+          cpus: '0.55'
+          memory: 1G
+      labels:
+        - "traefik.enable=true"
+        # Traefik URL (replace with yours)
+        - "traefik.http.routers.dashboard.rule=Host(`traefik.heyvaldemar.net`)"
+        - "traefik.http.routers.dashboard.service=api@internal"
+        - "traefik.http.routers.dashboard.entrypoints=websecure"
+        - "traefik.http.services.dashboard.loadbalancer.server.port=8080"
+        - "traefik.http.routers.dashboard.tls=true"
+        - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
+        - "traefik.http.services.dashboard.loadbalancer.passhostheader=true"
+        - "traefik.http.routers.dashboard.middlewares=authtraefik"
+        # Basic Authentication for Traefik Dashboard
+        # Username: traefikadmin (replace with yours)
+        # Passwords must be encoded using MD5, SHA1, or BCrypt
+        - "traefik.http.middlewares.authtraefik.basicauth.users=traefikadmin:$$2y$$10$$zod9yMxCS1Hpk1BqIj0PN.FYy6.HUMDO/GYJ6JpvkWQ5kzIATdCBK"
+        - "traefik.http.routers.http-catchall.rule=HostRegexp(`{host:.+}`)"
+        - "traefik.http.routers.http-catchall.entrypoints=web"
+        - "traefik.http.routers.http-catchall.middlewares=redirect-to-https"
+        - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
