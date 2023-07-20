@@ -75,7 +75,7 @@ services:
   traefik:
     <<: *default-opts
     # Image tag (replace with yours)
-    image: traefik:2.8
+    image: traefik:2.9
     command:
       - "--log.level=WARN"
       - "--accesslog=true"
@@ -86,6 +86,8 @@ services:
       - "--entryPoints.ping.address=:8082"
       - "--entryPoints.web.address=:80"
       - "--entryPoints.websecure.address=:443"
+      # For Mattermost
+      # - "--entryPoints.calls.address=:8443/udp"
       - "--providers.docker=true"
       - "--providers.docker.watch=true"
       - "--providers.docker.swarmMode=true"
