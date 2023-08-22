@@ -107,6 +107,8 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      # For Mattermost
+      # - "8443:8443"
     configs:
       - source: traefik-dynamic-configuration.yml
         target: /etc/traefik/configs/traefik-dynamic-configuration.yml
