@@ -112,7 +112,7 @@ services:
       - "80:80"
       - "443:443"
       # For Mattermost
-      # - "8443:8443"
+      # - "8443:8443/udp"
     configs:
       - source: traefik-dynamic-configuration.yml
         target: /etc/traefik/configs/traefik-dynamic-configuration.yml
